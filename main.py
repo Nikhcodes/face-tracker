@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
 """
-Pose Cam — Real-Time Hand Gesture Tracker
-------------------------------------------
-Detects hand poses via MediaPipe and overlays
-a custom PNG image for each recognised gesture.
-
-Poses:
-  idle       no hands detected (after 1.5s)
+pose-cam — real-time hand gesture recognition
+----------------------------------------------
+Gestures:
+  idle       no hands detected (1.5s delay)
   point      index finger only
-  peace      index + middle up
-  think      fist held low and centered
-  rodrick    both fists raised near shoulders
+  peace      index + middle extended
+  think      fist at chin level
+  rodrick    both fists raised above shoulders
   hello      open hand, all fingers spread
   thumbsup   fist with thumb pointing up
-  rockon     index + pinky up
+  rockon     index + pinky extended
 
-Controls:  ESC to quit
+Controls: ESC to quit
 """
 
 import cv2
@@ -28,27 +25,8 @@ import urllib.request
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
 
-# ── Catppuccin Mocha palette (BGR) ────────────────────────────────────────────
-MOCHA = {
-    "base":    (  30,  30,  46),   # #1e1e2e
-    "surface": (  49,  50,  69),   # #313244
-    "overlay": (  62,  60,  88),   # #45475a (approx)
-    "text":    ( 205, 214, 244),   # #cdd6f4
-    "subtext": ( 166, 173, 200),   # #a6adc8
-    "lavender":( 235, 190, 180),   # #b4befe
-    "blue":    ( 243, 189, 137),   # #89b4fa
-    "green":   ( 166, 227, 161),   # #a6e3a1
-    "yellow":  ( 148, 226, 213),   # #d5c4a1 approx / using teal
-    "peach":   ( 122, 162, 250),   # #fab387
-    "mauve":   ( 203, 166, 247),   # #cba4f7
-    "red":     ( 114, 135, 243),   # #f38ba8
-    "sky":     ( 231, 218, 137),   # #89dceb
-    "sapphire":( 220, 185, 116),   # #74c7ec
-    "pink":    ( 193, 148, 245),   # #f5c2e7
-    "teal":    ( 180, 214, 148),   # #94e2d5
-}
-
 # ── Model ─────────────────────────────────────────────────────────────────────
+
 MODEL_PATH = "hand_landmarker.task"
 if not os.path.exists(MODEL_PATH):
     print("[INFO] Downloading hand_landmarker.task ...")
@@ -59,6 +37,7 @@ if not os.path.exists(MODEL_PATH):
     print("[INFO] Done!")
 
 # ── Landmark indices ──────────────────────────────────────────────────────────
+
 THUMB_TIP, THUMB_MCP   = 4, 2
 INDEX_TIP,  INDEX_PIP  = 8,  6
 MIDDLE_TIP, MIDDLE_PIP = 12, 10
@@ -78,6 +57,7 @@ CONNECTIONS = [
 ]
 
 # ── Overlay helpers ───────────────────────────────────────────────────────────
+
 def load_overlay(path: str):
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     if img is None:
@@ -87,7 +67,7 @@ def load_overlay(path: str):
     return img
 
 
-def blend(bg, fg, x: int, y: int, scale: float = 1.0, alpha: float = 1.0):
+def blend(bg, fg, x: int, y: int, scale: float = 1.0):
     if fg is None:
         return bg
     h0, w0 = fg.shape[:2]
@@ -103,13 +83,14 @@ def blend(bg, fg, x: int, y: int, scale: float = 1.0, alpha: float = 1.0):
         return bg
     roi = bg[y1:y2, x1:x2].astype(np.float32)
     fgr = fg[fy1:fy2, fx1:fx2]
-    a   = (fgr[:, :, 3:4].astype(np.float32) / 255.0) * alpha
+    a   = fgr[:, :, 3:4].astype(np.float32) / 255.0
     src = fgr[:, :, :3].astype(np.float32)
     bg[y1:y2, x1:x2] = (a * src + (1 - a) * roi).astype(np.uint8)
     return bg
 
 # ── Camera polish ─────────────────────────────────────────────────────────────
-def build_vignette(h: int, w: int, strength: float = 0.5) -> np.ndarray:
+
+def build_vignette(h: int, w: int, strength: float = 0.45) -> np.ndarray:
     ky = np.linspace(-1, 1, h)
     kx = np.linspace(-1, 1, w)
     X, Y = np.meshgrid(kx, ky)
@@ -132,6 +113,7 @@ def auto_enhance(frame: np.ndarray) -> np.ndarray:
     return frame.astype(np.uint8)
 
 # ── Gesture logic ─────────────────────────────────────────────────────────────
+
 def fingers_up(hand) -> list:
     return [hand[tip].y < hand[pip].y for tip, pip in zip(FINGER_TIPS, FINGER_PIPS)]
 
@@ -186,110 +168,90 @@ def classify_pose(hands: list, fw: int, fh: int) -> str:
     return ""
 
 # ── Landmark drawing ──────────────────────────────────────────────────────────
+
 def draw_landmarks(frame, hand):
     h, w = frame.shape[:2]
     pts = [(int(lm.x * w), int(lm.y * h)) for lm in hand]
-    line_color = MOCHA["overlay"]
-    dot_color  = MOCHA["lavender"]
-    tip_color  = MOCHA["blue"]
     for a, b in CONNECTIONS:
-        cv2.line(frame, pts[a], pts[b], line_color, 1, cv2.LINE_AA)
+        cv2.line(frame, pts[a], pts[b], (200, 200, 200), 1, cv2.LINE_AA)
     for i, (x, y) in enumerate(pts):
-        is_tip = i in (4, 8, 12, 16, 20)
-        r = 5 if is_tip else 3
-        cv2.circle(frame, (x, y), r + 1, MOCHA["base"], -1)
-        cv2.circle(frame, (x, y), r, tip_color if is_tip else dot_color, -1)
+        r = 4 if i in (4, 8, 12, 16, 20) else 2
+        cv2.circle(frame, (x, y), r + 1, (0, 0, 0), -1)
+        cv2.circle(frame, (x, y), r, (255, 255, 255), -1)
 
-# ── Pose panel (right sidebar) ────────────────────────────────────────────────
-POSE_TABLE = [
+# ── Glass cheat sheet (top-right corner) ─────────────────────────────────────
+
+CHEAT_ROWS = [
     ("idle",     "stare at camera"),
-    ("point",    "index finger only"),
-    ("peace",    "index + middle up"),
-    ("think",    "fist at chin level"),
-    ("rodrick",  "both fists up high"),
-    ("hello",    "open hand, spread"),
-    ("thumbsup", "fist, thumb up"),
-    ("rockon",   "index + pinky up"),
+    ("point",    "index finger"),
+    ("peace",    "index + middle"),
+    ("think",    "fist at chin"),
+    ("rodrick",  "both fists up"),
+    ("hello",    "open hand"),
+    ("thumbsup", "thumb up"),
+    ("rockon",   "index + pinky"),
 ]
 
-POSE_COLORS = {
-    "idle":     MOCHA["subtext"],
-    "point":    MOCHA["yellow"],
-    "peace":    MOCHA["green"],
-    "think":    MOCHA["mauve"],
-    "rodrick":  MOCHA["red"],
-    "hello":    MOCHA["sky"],
-    "thumbsup": MOCHA["peach"],
-    "rockon":   MOCHA["pink"],
-}
-
-PANEL_W      = 220
-PANEL_PAD    = 14
-ROW_H        = 36
-FONT         = cv2.FONT_HERSHEY_SIMPLEX
-FONT_SMALL   = 0.42
-FONT_LABEL   = 0.52
-THICK        = 1
+FONT       = cv2.FONT_HERSHEY_SIMPLEX
+_ROW_H     = 18
+_PAD       = 10
+_FONT_S    = 0.36
+_THICK     = 1
 
 
-def draw_panel(canvas: np.ndarray, active_pose: str):
-    """Draw the Catppuccin-styled pose reference panel on the right."""
-    fh, fw = canvas.shape[:2]
-    px = fw - PANEL_W
-    panel_h = fh
+def draw_cheatsheet(frame, active_pose: str):
+    fh, fw = frame.shape[:2]
 
-    # Panel background
-    overlay_layer = canvas.copy()
-    cv2.rectangle(overlay_layer, (px, 0), (fw, panel_h), MOCHA["base"], -1)
-    cv2.addWeighted(overlay_layer, 0.82, canvas, 0.18, 0, canvas)
+    # measure width from longest row
+    max_w = 0
+    for name, hint in CHEAT_ROWS:
+        row_text = f"{name}  {hint}"
+        (tw, _), _ = cv2.getTextSize(row_text, FONT, _FONT_S, _THICK)
+        max_w = max(max_w, tw)
 
-    # Thin separator line
-    cv2.line(canvas, (px, 0), (px, panel_h), MOCHA["surface"], 1)
+    box_w = max_w + _PAD * 2
+    box_h = len(CHEAT_ROWS) * _ROW_H + _PAD * 2
+    margin = 12
+    x0 = fw - box_w - margin
+    y0 = margin
 
-    # Header
-    header_y = 28
-    cv2.putText(canvas, "POSES", (px + PANEL_PAD, header_y),
-                FONT, FONT_LABEL, MOCHA["text"], THICK, cv2.LINE_AA)
-    cv2.line(canvas, (px + PANEL_PAD, header_y + 6),
-             (fw - PANEL_PAD, header_y + 6), MOCHA["surface"], 1)
+    # frosted glass — very subtle dark tint, low opacity
+    glass = frame.copy()
+    cv2.rectangle(glass, (x0, y0), (x0 + box_w, y0 + box_h), (20, 20, 20), -1)
+    cv2.addWeighted(glass, 0.35, frame, 0.65, 0, frame)
 
-    # Rows
-    for i, (pose, hint) in enumerate(POSE_TABLE):
-        row_y = header_y + 20 + i * ROW_H
-        color = POSE_COLORS.get(pose, MOCHA["subtext"])
-        is_active = (pose == active_pose)
+    # thin border
+    cv2.rectangle(frame, (x0, y0), (x0 + box_w, y0 + box_h), (255, 255, 255), 1)
+    # make border very faint
+    border_layer = frame.copy()
+    cv2.rectangle(border_layer, (x0, y0), (x0 + box_w, y0 + box_h), (255, 255, 255), 1)
+    cv2.addWeighted(border_layer, 0.18, frame, 0.82, 0, frame)
 
-        # Active row highlight
+    # rows
+    for i, (name, hint) in enumerate(CHEAT_ROWS):
+        row_y = y0 + _PAD + i * _ROW_H + _ROW_H - 4
+        is_active = (name == active_pose)
+
         if is_active:
-            hi = canvas.copy()
+            hi = frame.copy()
             cv2.rectangle(hi,
-                          (px + 4, row_y - 2),
-                          (fw - 4, row_y + ROW_H - 8),
-                          MOCHA["surface"], -1)
-            cv2.addWeighted(hi, 0.7, canvas, 0.3, 0, canvas)
+                          (x0 + 2, row_y - _ROW_H + 4),
+                          (x0 + box_w - 2, row_y + 4),
+                          (255, 255, 255), -1)
+            cv2.addWeighted(hi, 0.12, frame, 0.88, 0, frame)
 
-        # Accent dot
-        dot_x = px + PANEL_PAD + 5
-        dot_y = row_y + 10
-        cv2.circle(canvas, (dot_x, dot_y), 4, color, -1)
+        name_col = (255, 255, 255) if is_active else (180, 180, 180)
+        hint_col = (160, 160, 160) if is_active else (100, 100, 100)
 
-        # Pose name
-        name_color = MOCHA["text"] if is_active else color
-        cv2.putText(canvas, pose, (dot_x + 12, dot_y + 4),
-                    FONT, FONT_LABEL, name_color, THICK, cv2.LINE_AA)
+        cv2.putText(frame, name, (x0 + _PAD, row_y),
+                    FONT, _FONT_S, name_col, _THICK, cv2.LINE_AA)
 
-        # Hint text
-        cv2.putText(canvas, hint, (dot_x + 12, dot_y + 18),
-                    FONT, FONT_SMALL, MOCHA["subtext"], 1, cv2.LINE_AA)
-
-    # Footer
-    footer_text = "ESC to quit"
-    (fw2, _), _ = cv2.getTextSize(footer_text, FONT, FONT_SMALL, 1)
-    cv2.putText(canvas, footer_text,
-                (px + (PANEL_W - fw2) // 2, panel_h - 14),
-                FONT, FONT_SMALL, MOCHA["overlay"], 1, cv2.LINE_AA)
+        (nw, _), _ = cv2.getTextSize(name, FONT, _FONT_S, _THICK)
+        cv2.putText(frame, f"  {hint}", (x0 + _PAD + nw, row_y),
+                    FONT, _FONT_S, hint_col, _THICK, cv2.LINE_AA)
 
 # ── HUD pill label ────────────────────────────────────────────────────────────
+
 LABELS = {
     "idle":     "idle",
     "point":    "point",
@@ -302,35 +264,31 @@ LABELS = {
 }
 
 
-def draw_hud(frame, pose: str, fade: float = 1.0, cam_w: int = 0):
+def draw_hud(frame, pose: str, fade: float = 1.0):
     if not pose or fade <= 0:
         return
     label = LABELS.get(pose, pose).upper()
-    color = POSE_COLORS.get(pose, MOCHA["text"])
-
-    scale, thick = 0.72, 2
-    (tw, th), _ = cv2.getTextSize(label, FONT, scale, thick)
-    fh = frame.shape[0]
-    if cam_w == 0:
-        cam_w = frame.shape[1]
-
+    fh, fw = frame.shape[:2]
+    font_scale, thick = 0.72, 2
+    (tw, th), _ = cv2.getTextSize(label, FONT, font_scale, thick)
     pad_x, pad_y = 18, 9
     pill_w = tw + pad_x * 2
     pill_h = th + pad_y * 2
-    x = (cam_w - pill_w) // 2
+    x = (fw - pill_w) // 2
     y = fh - pill_h - 20
 
-    # Pill background
     layer = frame.copy()
-    cv2.rectangle(layer, (x, y), (x + pill_w, y + pill_h), MOCHA["base"], -1)
-    cv2.rectangle(layer, (x, y), (x + pill_w, y + pill_h), color, 2)
-    cv2.addWeighted(layer, fade * 0.90, frame, 1 - fade * 0.90, 0, frame)
+    cv2.rectangle(layer, (x, y), (x + pill_w, y + pill_h), (20, 20, 20), -1)
+    cv2.rectangle(layer, (x, y), (x + pill_w, y + pill_h), (255, 255, 255), 1)
+    cv2.addWeighted(layer, fade * 0.80, frame, 1 - fade * 0.80, 0, frame)
 
-    text_color = tuple(int(c * fade) for c in color)
+    alpha_val = int(255 * fade)
+    text_color = (alpha_val, alpha_val, alpha_val)
     cv2.putText(frame, label, (x + pad_x, y + pad_y + th),
-                FONT, scale, text_color, thick, cv2.LINE_AA)
+                FONT, font_scale, text_color, thick, cv2.LINE_AA)
 
 # ── Load overlays ─────────────────────────────────────────────────────────────
+
 POSE_FILES = {
     "idle":     "overlays/idle.png",
     "point":    "overlays/point.png",
@@ -352,6 +310,7 @@ for pose, path in POSE_FILES.items():
         print(f"[WARN] Missing '{pose}' -> {path}")
 
 # ── MediaPipe ─────────────────────────────────────────────────────────────────
+
 landmarker = vision.HandLandmarker.create_from_options(
     vision.HandLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=MODEL_PATH),
@@ -361,6 +320,7 @@ landmarker = vision.HandLandmarker.create_from_options(
 )
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
+
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
     raise RuntimeError("Cannot open webcam")
@@ -394,11 +354,9 @@ while True:
     if vignette_mask is None:
         vignette_mask = build_vignette(fh, fw)
 
-    # Camera polish
     frame = auto_enhance(frame)
     frame = apply_vignette(frame, vignette_mask)
 
-    # Hand detection
     rgb    = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
     result = landmarker.detect_for_video(mp_img, timestamp_ms=ts_ms)
@@ -409,7 +367,6 @@ while True:
         for hand in hands:
             draw_landmarks(frame, hand)
 
-    # Pose classification
     if hands:
         new_pose = classify_pose(hands, fw, fh)
     else:
@@ -419,26 +376,20 @@ while True:
         current_pose  = new_pose
         pose_start_ts = now
 
-    # Overlay image (keep within camera area, left of panel)
-    cam_display_w = fw - PANEL_W
     if current_pose and current_pose in overlays:
         ov     = overlays[current_pose]
         oh, ow = ov.shape[:2]
-        scale  = min(cam_display_w * 0.26 / ow, fh * 0.26 / oh)
+        scale  = min(fw * 0.26 / ow, fh * 0.26 / oh)
         frame  = blend(frame, ov, 24, 24, scale)
 
-    # Build final canvas with panel
-    canvas = np.zeros((fh, fw + PANEL_W, 3), dtype=np.uint8)
-    canvas[:, :fw] = frame
-    draw_panel(canvas, current_pose)
+    draw_cheatsheet(frame, current_pose)
 
-    # HUD label centered over camera area only
     if current_pose:
         elapsed = now - pose_start_ts
         fade    = min(elapsed / FADE_IN_SECS, 1.0)
-        draw_hud(canvas, current_pose, fade, cam_w=fw)
+        draw_hud(frame, current_pose, fade)
 
-    cv2.imshow("Pose Cam", canvas)
+    cv2.imshow("pose-cam", frame)
     if cv2.waitKey(1) & 0xFF == 27:
         break
 
