@@ -185,14 +185,7 @@ public/
   models/     hand_landmarker.task
   overlays/   built-in stickers
   packs/      (optional) default.json, your published pose pack
-legacy/python/  the original opencv version
 ```
-
----
-
-## the original python version
-
-this started as a python + opencv desktop script. it's preserved in [`legacy/python/`](legacy/python/) if you want to run it.
 
 ---
 
@@ -200,7 +193,7 @@ this started as a python + opencv desktop script. it's preserved in [`legacy/pyt
 
 [mediapipe](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) (apache-2.0) · fonts: bricolage grotesque & inter (ofl) · icons: lucide (isc)
 
-<sub>sticker images are internet memes carried over from the original project. their copyright belongs to their owners. swap them in the pose editor if you publish this somewhere serious.</sub>
+<sub>this project started as a python + opencv desktop script; it lives on in this repo's git history.<br />sticker images are internet memes carried over from the original project. their copyright belongs to their owners. swap them in the pose editor if you publish this somewhere serious.</sub>
 
 ---
 
