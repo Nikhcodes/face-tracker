@@ -1,0 +1,51 @@
+{
+  "name": "pose-cam",
+  "version": "1.0.0",
+  "description": "POSE CAM — a real-time hand-gesture camera playground that runs entirely in your browser.",
+  "scripts": {
+    "copy-wasm": "node scripts/copy-mediapipe.mjs",
+    "predev": "npm run copy-wasm",
+    "dev": "vite",
+    "prebuild": "npm run copy-wasm",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "5.1.0",
+    "@fontsource-variable/inter": "5.1.0",
+    "@mediapipe/tasks-vision": "0.10.35",
+    "lucide-react": "0.460.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.63.0",
+    "@testing-library/dom": "10.4.0",
+    "@testing-library/react": "16.1.0",
+    "@types/node": "22.18.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "5.2.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-react-hooks": "5.0.0",
+    "globals": "15.12.0",
+    "jsdom": "26.1.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.2",
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  }
+}
